@@ -1,0 +1,4 @@
+TestCode/TestVenv/
+TestVenv/
+.env
+TestCode/.env
