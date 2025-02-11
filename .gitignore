@@ -2,3 +2,4 @@ TestCode/TestVenv/
 TestVenv/
 .env
 TestCode/.env
+pipeline/.env
