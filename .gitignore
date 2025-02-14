@@ -3,3 +3,4 @@ TestVenv/
 .env
 TestCode/.env
 pipeline/.env
+TestCode/prompt_refine.ipynb
