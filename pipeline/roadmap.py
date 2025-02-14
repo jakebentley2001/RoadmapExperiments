@@ -33,7 +33,7 @@ def extract_subtopics(stage_text):
 # --------------------------
 # 1. Fetch resources per subtopic
 # --------------------------
-def fetch_resources_for_subtopic(subtopic):
+def fetch_resources_for_subtopic(subtopic, resources):
     """
     Fetch additional educational resources for a given subtopic.
     
@@ -56,7 +56,11 @@ def fetch_resources_for_subtopic(subtopic):
         - *Resource*
             *Short Description*
         - *Resource*
-            *Short Description*"""
+            *Short Description*
+            
+        only uses these resources {resources}
+        """
+
     )
 
     
@@ -172,7 +176,7 @@ def update_markdown_file_with_stage(roadmap_file, updated_stage_text, stage_head
 # --------------------------
 # 4. Process a stage after it is streamed
 # --------------------------
-def process_stage(stage_text, roadmap_file):
+def process_stage(stage_text, roadmap_file, resources):
     """
     For a completed stage, fetch resources for each subtopic, update the stage text
     with these resources inserted under each bullet, and then update the markdown file.
@@ -182,7 +186,7 @@ def process_stage(stage_text, roadmap_file):
         print("\nFetching additional resources for subtopics...\n")
         subtopic_resources = {}
         for subtopic in subtopics:
-            resource = fetch_resources_for_subtopic(subtopic)
+            resource = fetch_resources_for_subtopic(subtopic, resources)
             subtopic_resources[subtopic] = resource
         
         # Update the stage text in memory
@@ -207,13 +211,32 @@ def process_stage(stage_text, roadmap_file):
 
 def gather_open_resource(final_prompt):
     client = OpenAI()
-    
+
+    newline_index = final_prompt.find('\n')
+    new_prompt = final_prompt[:newline_index]
+
+    prompt = f"""
+        This is the goal of the a roadmap builder: {new_prompt}
+        I want you to find 10 educational websites that offer open source information that would help with the goal. 
+        and the only output to be of the format: source source source ...
+
+    """
     response = client.chat.completions.create(
             model="gpt-4o",  # Use your desired model name
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
             max_tokens=150  # Adjust as necessary
         )
+    
+    resource_content = response.choices[0].message.content.strip()
+  
+    resource_list = (
+        [line.split(". ", 1)[1] for line in resource_content.split("\n") if ". " in line]
+    )
+    if resource_list == []:
+        resource_list = [line for line in resource_content.split(" ")]
+
+    return resource_content, resource_list
 
 
 def create_roadmap(final_prompt):
@@ -222,6 +245,8 @@ def create_roadmap(final_prompt):
     and update the stage in the markdown file so that each subtopic's resources are inserted
     right under its bullet point.
     """
+    resources, result_list = gather_open_resource(final_prompt)
+
     client = OpenAI()
     prompt = final_prompt + ": " + structure_prompt
 
@@ -255,7 +280,7 @@ def create_roadmap(final_prompt):
                 print("Stage boundary detected; processing resources for the completed stage...")
                 threading.Thread(
                     target=process_stage,
-                    args=(stage_text, roadmap_file)
+                    args=(stage_text, roadmap_file, resources)
                 ).start()
                 stage_text = ""  # Reset for the next stage
                 counter += 1
